@@ -4,9 +4,13 @@
   "description": "A Mobiledoc renderer for React written with Typescript",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
-    "lint": "eslint src/ --ext .ts"
+    "lint": "eslint src/ --ext .ts",
+    "prepare": "npm run lint && npm run build"
   },
   "keywords": [
     "react",
