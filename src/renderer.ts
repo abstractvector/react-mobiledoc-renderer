@@ -1,4 +1,4 @@
-import { createElement, Fragment } from 'react';
+import React from 'react';
 
 import { attributeArrayToReactProps } from './utils';
 
@@ -138,9 +138,15 @@ export default class Renderer {
     throw new RendererError(message);
   }
 
-  async #runPlugins(method: 'onRenderSection', payload: SectionType, { mobiledoc }: { mobiledoc: Mobiledoc }) {
+  async #runPlugins(
+    method: string,
+    payload: unknown,
+    { mobiledoc }: { mobiledoc: Mobiledoc }
+  ): Promise<React.FunctionComponent<{ children: React.ReactNode }> | React.Component | React.ReactNode | undefined> {
     for (const plugin of this.plugins) {
       const pluginMethod = (plugin as Record<string, unknown>)[method];
+
+      if (pluginMethod === undefined) continue;
 
       if (typeof pluginMethod !== 'function') {
         this.#error(`Plugin provided non-function method for: ${method}`);
@@ -148,12 +154,29 @@ export default class Renderer {
       }
 
       switch (method) {
-        case 'onRenderSection': {
-          if (typeof plugin.onRenderSection !== 'function') break;
-          const result = await plugin.onRenderSection(payload, { mobiledoc });
-          if (result !== undefined) return result;
+        case 'onRenderMarkup': {
+          if (typeof plugin.onRenderMarkup !== 'function') break;
+
+          const result = await plugin.onRenderMarkup(
+            payload as { tagName: string; attributes: Record<string, string>; value: string },
+            { mobiledoc }
+          );
+
+          if (typeof result === 'function') return result;
+
           break;
         }
+
+        case 'onRenderSection': {
+          if (typeof plugin.onRenderSection !== 'function') break;
+
+          const result = await plugin.onRenderSection(payload as SectionType, { mobiledoc });
+
+          if (result !== undefined) return result;
+
+          break;
+        }
+
         default: {
           this.#error(`Attempted to call an unrecognized plugin method: ${method}`);
         }
@@ -163,7 +186,7 @@ export default class Renderer {
   }
 
   async render(_mobiledoc: Mobiledoc | object): Promise<{
-    result: React.FunctionComponentElement<{ children?: React.ReactNode }>;
+    result: React.ReactElement;
     teardown: () => void;
   }> {
     const mobiledoc = _mobiledoc instanceof Mobiledoc ? _mobiledoc : new Mobiledoc(_mobiledoc);
@@ -172,7 +195,7 @@ export default class Renderer {
       mobiledoc.sections.map((section) => this.#renderSection({ section, mobiledoc }))
     );
 
-    const result = createElement(Fragment, { children: sectionElements });
+    const result = React.createElement(React.Fragment, { children: sectionElements });
 
     return {
       result,
@@ -188,20 +211,25 @@ export default class Renderer {
   }: {
     section: SectionType;
     mobiledoc: Mobiledoc;
-  }): Promise<React.DOMElement<React.DOMAttributes<Element>, Element> | undefined> {
+  }): Promise<React.ReactElement | undefined> {
     const [sectionTypeIdentifier] = section;
 
     const output = await this.#runPlugins('onRenderSection', section, { mobiledoc });
-    if (output !== undefined) {
-      return output;
+    let customTag;
+    if (typeof output === 'object') {
+      return output as React.ReactElement;
+    } else if (typeof output === 'function') {
+      customTag = output;
     }
 
     switch (sectionTypeIdentifier) {
       case 1: {
         // Markup (text)
         const [, tagName, markers, optionalSectionAttributesArray] = section as SectionMarkupType;
-        const element = createElement(tagName, {
-          children: markers.map((marker) => this.#renderMarker({ marker, mobiledoc })),
+        const element = React.createElement(customTag ?? tagName, {
+          children: await Promise.all(
+            markers.map(async (marker, key) => await this.#renderMarker({ marker, key, mobiledoc }))
+          ),
           ...attributeArrayToReactProps(optionalSectionAttributesArray),
         });
         return element;
@@ -210,19 +238,23 @@ export default class Renderer {
       case 2: {
         // Image
         const [, src] = section as SectionImageType;
-        const element = createElement('img', { children: undefined, src });
+        const element = React.createElement('img', { children: undefined, src });
         return element;
       }
 
       case 3: {
         // List
         const [, tagName, listItems, optionalSectionAttributesArray] = section as SectionListType;
-        const element = createElement(tagName, {
-          children: listItems.map((markers) => {
-            return createElement('li', {
-              children: markers.map((marker) => this.#renderMarker({ marker, mobiledoc })),
-            });
-          }),
+        const element = React.createElement(tagName, {
+          children: await Promise.all(
+            listItems.map(async (markers) => {
+              return React.createElement('li', {
+                children: await Promise.all(
+                  markers.map((marker, key) => this.#renderMarker({ marker, key, mobiledoc }))
+                ),
+              });
+            })
+          ),
           ...attributeArrayToReactProps(optionalSectionAttributesArray),
         });
         return element;
@@ -257,16 +289,15 @@ export default class Renderer {
     return undefined;
   }
 
-  #renderMarker({
+  async #renderMarker({
     marker,
+    key,
     mobiledoc,
   }: {
     marker: MarkerType;
+    key: string | number;
     mobiledoc: Mobiledoc;
-  }):
-    | React.DOMElement<React.DOMAttributes<Element>, Element>
-    | React.FunctionComponentElement<{ children?: React.ReactNode }>
-    | undefined {
+  }): Promise<React.ReactNode | undefined> {
     const [textTypeIdentifier, openMarkupsIndexes, , value] = marker;
 
     switch (textTypeIdentifier) {
@@ -279,9 +310,9 @@ export default class Renderer {
             this.#error(`Invalid markup reference: ${openMarkupsIndexes[0]}`);
             return undefined;
           }
-          return this.#renderMarkup({ markup, value });
+          return await this.#renderMarkup({ markup, value, mobiledoc });
         } else {
-          return createElement(Fragment, { children: value });
+          return React.createElement(React.Fragment, { children: value, key });
         }
       }
       case 1: {
@@ -316,15 +347,24 @@ export default class Renderer {
     }
   }
 
-  #renderMarkup({
-    markup: [tagName, attributeArray],
+  async #renderMarkup({
+    markup,
     value,
+    mobiledoc,
   }: {
     markup: MarkupType;
     value: string;
-  }): React.DOMElement<React.DOMAttributes<Element>, Element> {
-    // @todo add support for custom markup renderers
+    mobiledoc: Mobiledoc;
+  }): Promise<React.ReactElement | undefined> {
+    const [tagName, attributeArray] = markup;
+    const attributes = attributeArrayToReactProps(attributeArray);
 
-    return createElement(tagName, { children: value, ...attributeArrayToReactProps(attributeArray) });
+    const output = await this.#runPlugins('onRenderMarkup', { tagName, attributes, value }, { mobiledoc });
+    let customTag;
+    if (typeof output === 'function') {
+      customTag = output;
+    }
+
+    return React.createElement(customTag ?? tagName, { children: value, ...attributes });
   }
 }

@@ -1,31 +1,22 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React from 'react';
 import ShortcodeParser from '@elderjs/shortcodes';
 
 import type { SectionType } from '../mobiledoc';
 import BasePlugin from './base';
 
-export type ShortcodePluginRendererType = ({
-  env,
-  attributes,
-  value,
-}: {
-  env: {
-    name: string;
-  };
-  attributes: Record<string, string>;
-  value: string | undefined;
-}) => React.DOMElement<React.DOMAttributes<Element>, Element> | undefined;
-
 export type UnknownShortcodeHandlerType = (shortcode: string) => void;
 
 export interface ShortcodePluginInput {
-  shortcodes?: Record<string, ShortcodePluginRendererType>;
+  shortcodes?: Record<string, React.Component | React.FunctionComponent<any>>;
+
   unknownShortcodeHandler?: UnknownShortcodeHandlerType;
 }
 
 export default class ShortcodePlugin extends BasePlugin {
   #parser = ShortcodeParser();
 
-  #shortcodes: Record<string, ShortcodePluginRendererType> = {};
+  #shortcodes: Record<string, React.Component | React.FunctionComponent<any>> = {};
   #unknownShortcodeHandler: UnknownShortcodeHandlerType | undefined;
 
   constructor({ shortcodes = {}, unknownShortcodeHandler }: ShortcodePluginInput) {
@@ -36,12 +27,12 @@ export default class ShortcodePlugin extends BasePlugin {
     this.#addShortcodes(shortcodes);
   }
 
-  #addShortcodes(shortcodes: Record<string, ShortcodePluginRendererType>) {
+  #addShortcodes(shortcodes: Record<string, React.Component | React.FunctionComponent<any>>) {
     Object.entries(shortcodes).forEach(([shortcode, renderer]) => {
       this.#shortcodes[shortcode] = renderer;
-      this.#parser.add(shortcode, (attributes: Record<string, string>, value?: string) => {
+      this.#parser.add(shortcode, (props: Record<string, string>, value?: string) => {
         // the module used for parsing shortcodes can only return a string here
-        return JSON.stringify({ shortcode, attributes, value });
+        return JSON.stringify({ shortcode, props: { ...props, children: value } });
       });
     });
   }
@@ -78,12 +69,10 @@ export default class ShortcodePlugin extends BasePlugin {
           return;
         }
 
-        const { shortcode, ...props } = output;
-        const renderer = this.#shortcodes[shortcode];
+        const { shortcode, props } = output;
+        const Shortcode = this.#shortcodes[shortcode];
 
-        if (typeof renderer === 'function') {
-          return renderer({ env: { name: shortcode }, ...props });
-        }
+        return typeof Shortcode === 'function' ? <Shortcode $shortcode={shortcode} {...props} /> : undefined;
       }
     }
 
