@@ -14,12 +14,6 @@ import Mobiledoc, {
 } from './mobiledoc';
 import type { PluginType } from './plugins/base';
 
-export interface AtomType {
-  name: string;
-  type?: string;
-  render: React.FunctionComponent<any>;
-}
-
 export interface RendererInput {
   atoms?: Record<string, React.FunctionComponent<any>>;
   atomOptions?: Record<string, unknown>;
