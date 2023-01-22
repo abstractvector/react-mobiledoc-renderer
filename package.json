@@ -1,0 +1,30 @@
+{
+  "name": "react-mobiledoc-renderer",
+  "version": "0.0.1",
+  "description": "A Mobiledoc renderer for React written with Typescript",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src/ --ext .ts"
+  },
+  "keywords": [
+    "react",
+    "mobiledoc",
+    "renderer"
+  ],
+  "author": "Matt Knight <hello@mattknight.io>",
+  "license": "MIT",
+  "devDependencies": {
+    "@tsconfig/node16-strictest": "^1.0.4",
+    "@types/node": "^18.11.18",
+    "@types/react": "^18.0.27",
+    "@typescript-eslint/eslint-plugin": "^5.48.2",
+    "@typescript-eslint/parser": "^5.48.2",
+    "eslint": "^8.32.0",
+    "typescript": "^4.9.4"
+  },
+  "dependencies": {
+    "react": "^18.2.0"
+  }
+}

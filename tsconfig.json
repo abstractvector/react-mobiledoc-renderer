@@ -1,0 +1,16 @@
+{
+  "extends": "@tsconfig/node16-strictest/tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react",
+    "outDir": "dist",
+    "declaration": true
+  },
+  "include": [
+    "src/**/*.ts",
+  ],
+  "moduleResolution": "node",
+  "exclude": [
+    "node_modules",
+    "lib"
+  ]
+}
