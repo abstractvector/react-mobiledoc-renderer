@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 
 import { attributeArrayToReactProps } from './utils';
@@ -13,66 +14,19 @@ import Mobiledoc, {
 } from './mobiledoc';
 import type { PluginType } from './plugins/base';
 
-export interface AtomRenderEnvType {
-  name: string;
-  onTeardown?: () => void;
-  save: ({ newValue, newPayload }: { newValue: string; newPayload: Record<string, unknown> }) => void;
-  [key: string]: unknown;
-}
-
-export type AtomRenderType = ({
-  env,
-  options,
-  payload,
-  value,
-}: {
-  env: AtomRenderEnvType;
-  options: Record<string, unknown>;
-  payload: Record<string, unknown>;
-  value: string;
-}) =>
-  | React.DOMElement<React.DOMAttributes<Element>, Element>
-  | React.FunctionComponentElement<{ children?: React.ReactNode }>
-  | undefined;
-
 export interface AtomType {
   name: string;
   type?: string;
-  render: AtomRenderType;
-}
-
-export interface CardRenderEnvType {
-  isInEditor: boolean;
-  name: string;
-  onTeardown?: () => void;
-  didRender?: () => void;
-  [key: string]: unknown;
-}
-
-export type CardRenderType = ({
-  env,
-  options,
-  payload,
-}: {
-  env: CardRenderEnvType;
-  options: Record<string, unknown>;
-  payload: Record<string, unknown>;
-}) => React.DOMElement<React.DOMAttributes<Element>, Element> | undefined;
-
-export interface CardType {
-  name: string;
-  type?: string;
-  render: CardRenderType;
-  edit?: CardRenderType;
+  render: React.FunctionComponent<any>;
 }
 
 export interface RendererInput {
-  atoms?: AtomType[];
+  atoms?: Record<string, React.FunctionComponent<any>>;
   atomOptions?: Record<string, unknown>;
-  cards?: CardType[];
+  cards?: Record<string, React.FunctionComponent<any>>;
   cardOptions?: Record<string, unknown>;
-  unknownAtomHandler?: AtomRenderType;
-  unknownCardHandler?: CardRenderType;
+  unknownAtomComponent?: React.FunctionComponent<any>;
+  unknownCardComponent?: React.FunctionComponent<any>;
   plugins?: PluginType[];
 }
 
@@ -84,14 +38,14 @@ export interface RendererOptions {
 class RendererError extends Error {}
 
 export default class Renderer {
-  atoms: AtomType[];
+  atoms: Record<string, React.FunctionComponent<any>>;
   atomOptions: Record<string, unknown>;
 
-  cards: CardType[];
+  cards: Record<string, React.FunctionComponent<any>>;
   cardOptions: Record<string, unknown>;
 
-  unknownAtomHandler: AtomRenderType | undefined;
-  unknownCardHandler: CardRenderType | undefined;
+  unknownAtomComponent: React.FunctionComponent<any> | undefined;
+  unknownCardComponent: React.FunctionComponent<any> | undefined;
 
   options: RendererOptions = {
     errorHandler: undefined,
@@ -105,28 +59,28 @@ export default class Renderer {
     atomOptions,
     cards,
     cardOptions,
-    unknownAtomHandler,
-    unknownCardHandler,
+    unknownAtomComponent,
+    unknownCardComponent,
     plugins,
   }: RendererInput = {}) {
-    this.atoms = atoms ?? [];
+    this.atoms = atoms ?? {};
     this.atomOptions = atomOptions ?? {};
 
-    this.cards = cards ?? [];
+    this.cards = cards ?? {};
     this.cardOptions = cardOptions ?? {};
 
-    this.unknownAtomHandler = unknownAtomHandler;
-    this.unknownCardHandler = unknownCardHandler;
+    this.unknownAtomComponent = unknownAtomComponent;
+    this.unknownCardComponent = unknownCardComponent;
 
     this.plugins = plugins ?? [];
   }
 
   getAtom(atomName: string) {
-    return this.atoms?.find((atom) => atom.name === atomName);
+    return this.atoms[atomName];
   }
 
   getCard(cardName: string) {
-    return this.cards?.find((card) => card.name === cardName);
+    return this.cards[cardName];
   }
 
   #error(message: string): true {
@@ -271,16 +225,19 @@ export default class Renderer {
         }
 
         const [cardName, cardPayload] = cardDefinition;
-        const card = this.getCard(cardName);
 
-        const render = card?.render ?? this.unknownCardHandler;
+        const card = this.getCard(cardName) ?? this.unknownCardComponent;
 
-        if (render === undefined) {
+        if (card === undefined) {
           this.#error(`No card handler specified for: ${cardName}`);
           return undefined;
         }
 
-        return render({ env: { name: cardName, isInEditor: false }, options: this.cardOptions, payload: cardPayload });
+        return React.createElement(card, {
+          env: { name: cardName },
+          options: this.cardOptions,
+          payload: cardPayload,
+        });
       }
     }
 
@@ -326,23 +283,20 @@ export default class Renderer {
         }
 
         const [atomName, atomText, atomPayload] = atomDefinition;
-        const atom = this.getAtom(atomName);
 
-        const render = atom?.render ?? this.unknownAtomHandler;
+        const atom = this.getAtom(atomName) ?? this.unknownAtomComponent;
 
-        if (render === undefined) {
+        if (atom === undefined) {
           this.#error(`No atom handler specified for: ${atomName}`);
           return undefined;
         }
 
-        const env: AtomRenderEnvType = {
-          name: atomName,
-          save: ({ newValue, newPayload }) => {
-            return render({ env, options: this.atomOptions, payload: newPayload, value: newValue });
-          },
-        };
-
-        return render({ env, options: this.atomOptions, payload: atomPayload, value: atomText });
+        return React.createElement(atom, {
+          env: { name: atomName },
+          options: this.atomOptions,
+          payload: atomPayload,
+          children: atomText,
+        });
       }
     }
   }
