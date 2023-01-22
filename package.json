@@ -1,6 +1,6 @@
 {
   "name": "react-mobiledoc-renderer",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A Mobiledoc renderer for React written with Typescript",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -29,6 +29,7 @@
     "typescript": "^4.9.4"
   },
   "dependencies": {
+    "@elderjs/shortcodes": "^2.0.2",
     "react": "^18.2.0"
   }
 }

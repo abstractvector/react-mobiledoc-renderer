@@ -1,5 +1,7 @@
 import { createElement, Fragment } from 'react';
 
+import { attributeArrayToReactProps } from './utils';
+
 import Mobiledoc, {
   type MarkerType,
   type MarkupType,
@@ -9,6 +11,7 @@ import Mobiledoc, {
   type SectionMarkupType,
   type SectionImageType,
 } from './mobiledoc';
+import type { PluginType } from './plugins/base';
 
 export interface AtomRenderEnvType {
   name: string;
@@ -34,7 +37,7 @@ export type AtomRenderType = ({
 
 export interface AtomType {
   name: string;
-  type: string;
+  type?: string;
   render: AtomRenderType;
 }
 
@@ -58,7 +61,7 @@ export type CardRenderType = ({
 
 export interface CardType {
   name: string;
-  type: string;
+  type?: string;
   render: CardRenderType;
   edit?: CardRenderType;
 }
@@ -70,6 +73,7 @@ export interface RendererInput {
   cardOptions?: Record<string, unknown>;
   unknownAtomHandler?: AtomRenderType;
   unknownCardHandler?: CardRenderType;
+  plugins?: PluginType[];
 }
 
 export interface RendererOptions {
@@ -94,7 +98,17 @@ export default class Renderer {
     suppressErrors: false,
   };
 
-  constructor({ atoms, atomOptions, cards, cardOptions, unknownAtomHandler, unknownCardHandler }: RendererInput = {}) {
+  plugins: PluginType[];
+
+  constructor({
+    atoms,
+    atomOptions,
+    cards,
+    cardOptions,
+    unknownAtomHandler,
+    unknownCardHandler,
+    plugins,
+  }: RendererInput = {}) {
     this.atoms = atoms ?? [];
     this.atomOptions = atomOptions ?? {};
 
@@ -103,6 +117,8 @@ export default class Renderer {
 
     this.unknownAtomHandler = unknownAtomHandler;
     this.unknownCardHandler = unknownCardHandler;
+
+    this.plugins = plugins ?? [];
   }
 
   getAtom(atomName: string) {
@@ -111,17 +127,6 @@ export default class Renderer {
 
   getCard(cardName: string) {
     return this.cards?.find((card) => card.name === cardName);
-  }
-
-  #attributeArrayToReactProps(attributeArray: string[] = []): Record<string, unknown> {
-    const attributes: Record<string, unknown> = {};
-
-    for (let i = 0; i < attributeArray.length; i += 2) {
-      const a = attributeArray[i];
-      if (a !== undefined) attributes[a] = attributeArray[i + 1];
-    }
-
-    return attributes;
   }
 
   #error(message: string): true {
@@ -133,13 +138,39 @@ export default class Renderer {
     throw new RendererError(message);
   }
 
-  render(_mobiledoc: Mobiledoc | object): {
+  async #runPlugins(method: 'onRenderSection', payload: SectionType, { mobiledoc }: { mobiledoc: Mobiledoc }) {
+    for (const plugin of this.plugins) {
+      const pluginMethod = (plugin as Record<string, unknown>)[method];
+
+      if (typeof pluginMethod !== 'function') {
+        this.#error(`Plugin provided non-function method for: ${method}`);
+        continue;
+      }
+
+      switch (method) {
+        case 'onRenderSection': {
+          if (typeof plugin.onRenderSection !== 'function') break;
+          const result = await plugin.onRenderSection(payload, { mobiledoc });
+          if (result !== undefined) return result;
+          break;
+        }
+        default: {
+          this.#error(`Attempted to call an unrecognized plugin method: ${method}`);
+        }
+      }
+    }
+    return;
+  }
+
+  async render(_mobiledoc: Mobiledoc | object): Promise<{
     result: React.FunctionComponentElement<{ children?: React.ReactNode }>;
     teardown: () => void;
-  } {
+  }> {
     const mobiledoc = _mobiledoc instanceof Mobiledoc ? _mobiledoc : new Mobiledoc(_mobiledoc);
 
-    const sectionElements = mobiledoc.sections.map((section) => this.#renderSection({ section, mobiledoc }));
+    const sectionElements = await Promise.all(
+      mobiledoc.sections.map((section) => this.#renderSection({ section, mobiledoc }))
+    );
 
     const result = createElement(Fragment, { children: sectionElements });
 
@@ -151,14 +182,19 @@ export default class Renderer {
     };
   }
 
-  #renderSection({
+  async #renderSection({
     section,
     mobiledoc,
   }: {
     section: SectionType;
     mobiledoc: Mobiledoc;
-  }): React.DOMElement<React.DOMAttributes<Element>, Element> | undefined {
+  }): Promise<React.DOMElement<React.DOMAttributes<Element>, Element> | undefined> {
     const [sectionTypeIdentifier] = section;
+
+    const output = await this.#runPlugins('onRenderSection', section, { mobiledoc });
+    if (output !== undefined) {
+      return output;
+    }
 
     switch (sectionTypeIdentifier) {
       case 1: {
@@ -166,7 +202,7 @@ export default class Renderer {
         const [, tagName, markers, optionalSectionAttributesArray] = section as SectionMarkupType;
         const element = createElement(tagName, {
           children: markers.map((marker) => this.#renderMarker({ marker, mobiledoc })),
-          ...this.#attributeArrayToReactProps(optionalSectionAttributesArray),
+          ...attributeArrayToReactProps(optionalSectionAttributesArray),
         });
         return element;
       }
@@ -187,7 +223,7 @@ export default class Renderer {
               children: markers.map((marker) => this.#renderMarker({ marker, mobiledoc })),
             });
           }),
-          ...this.#attributeArrayToReactProps(optionalSectionAttributesArray),
+          ...attributeArrayToReactProps(optionalSectionAttributesArray),
         });
         return element;
       }
@@ -289,6 +325,6 @@ export default class Renderer {
   }): React.DOMElement<React.DOMAttributes<Element>, Element> {
     // @todo add support for custom markup renderers
 
-    return createElement(tagName, { children: value, ...this.#attributeArrayToReactProps(attributeArray) });
+    return createElement(tagName, { children: value, ...attributeArrayToReactProps(attributeArray) });
   }
 }

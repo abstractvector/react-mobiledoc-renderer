@@ -6,7 +6,8 @@
     "declaration": true
   },
   "include": [
-    "src/**/*.ts",
+    "./src/**/*.ts",
+    "./global.d.ts",
   ],
   "moduleResolution": "node",
   "exclude": [

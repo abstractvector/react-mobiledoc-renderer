@@ -1,8 +1,8 @@
 export type MarkupType = [string, string[]];
 
-export type AtomType = [string, string, Record<string, unknown>];
+export type MobiledocAtomType = [string, string, Record<string, unknown>];
 
-export type CardType = [string, Record<string, unknown>];
+export type MobiledocCardType = [string, Record<string, unknown>];
 
 export type MarkerType =
   | [0, number[], number, string] // text
@@ -22,8 +22,8 @@ export type SectionType =
 export interface MobiledocInput {
   version?: string;
   markups?: (string | string[])[][];
-  atoms?: AtomType[];
-  cards?: CardType[];
+  atoms?: MobiledocAtomType[];
+  cards?: MobiledocCardType[];
   sections?: unknown[][];
 }
 
@@ -33,8 +33,8 @@ export default class Mobiledoc {
   version: string | undefined;
 
   markups: MarkupType[];
-  atoms: AtomType[];
-  cards: CardType[];
+  atoms: MobiledocAtomType[];
+  cards: MobiledocCardType[];
   sections: SectionType[];
 
   constructor({ version, markups, atoms, cards, sections }: MobiledocInput) {
