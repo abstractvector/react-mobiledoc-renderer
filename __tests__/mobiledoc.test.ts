@@ -2,6 +2,26 @@ import { Mobiledoc, MobiledocAtomType, MobiledocCardType } from '../src/';
 
 describe('Mobiledoc constructor', () => {
   test('Accepts an empty constructor', () => {
+    const mobiledoc = new Mobiledoc();
+
+    expect(mobiledoc).toBeInstanceOf(Mobiledoc);
+
+    expect(mobiledoc.version).toBeUndefined();
+    expect(mobiledoc.atoms).toStrictEqual([]);
+    expect(mobiledoc.cards).toStrictEqual([]);
+    expect(mobiledoc.markups).toStrictEqual([]);
+    expect(mobiledoc.sections).toStrictEqual([]);
+
+    expect(typeof mobiledoc.getAtom).toBe('function');
+    expect(typeof mobiledoc.getCard).toBe('function');
+    expect(typeof mobiledoc.getMarkup).toBe('function');
+
+    expect(mobiledoc.getAtom(0)).toBeUndefined();
+    expect(mobiledoc.getCard(0)).toBeUndefined();
+    expect(mobiledoc.getMarkup(0)).toBeUndefined();
+  });
+
+  test('Accepts an empty object for the constructor', () => {
     const mobiledoc = new Mobiledoc({});
 
     expect(mobiledoc).toBeInstanceOf(Mobiledoc);
@@ -180,4 +200,172 @@ describe('Mobiledoc sections', () => {
     expect(mobiledoc.sections[3]).toBeUndefined();
   });
 
+  describe('Markers', () => {
+    test('Requires array of markers in a section', () => {
+      const sections = [[1, 'p', 0]];
+
+      expect(() => {
+        new Mobiledoc({ sections });
+      }).toThrowError();
+    });
+
+    test('Requires a textual string for tet markers', () => {
+      const sections = [[1, 'p', [[0, [], 0, 0]]]];
+
+      expect(() => {
+        new Mobiledoc({ sections });
+      }).toThrowError();
+    });
+
+    test('Requires an array of numeric marker indexes to open', () => {
+      const sections = [[1, 'p', [[0, ['notanumber'], 0, 'text']]]];
+
+      expect(() => {
+        new Mobiledoc({ sections });
+      }).toThrowError();
+    });
+
+    test('Requires a number indicating how many markers to close', () => {
+      const sections = [[1, 'p', [[0, [], undefined, 'text']]]];
+
+      expect(() => {
+        new Mobiledoc({ sections });
+      }).toThrowError();
+    });
+
+    test('Accepts atom markers', () => {
+      const sections = [[1, 'p', [[1, [], 0, 0]], undefined]];
+
+      const mobiledoc = new Mobiledoc({ sections });
+
+      expect(mobiledoc.sections).toHaveLength(1);
+      expect(mobiledoc.sections[0]).toStrictEqual(sections[0]);
+    });
+
+    test('Expects atom markers to have numeric reference to atom', () => {
+      const sections = [[1, 'p', [[1, [], 0, 'notanumber']], undefined]];
+
+      expect(() => {
+        new Mobiledoc({ sections });
+      }).toThrowError();
+    });
+
+    test('Throws an error if an unrecognized marker type is specified', () => {
+      const sections = [[1, 'p', [[2, [], 0, 0]], undefined]];
+
+      expect(() => {
+        new Mobiledoc({ sections });
+      }).toThrowError();
+    });
+  });
+
+  describe('Markup sections', () => {
+    test('Supports markup sections', () => {
+      const section = [1, 'p', [[0, [], 0, 'Hello world!']], ['align', 'center']];
+      const mobiledoc = new Mobiledoc({ sections: [section] });
+
+      expect(mobiledoc.sections).toHaveLength(1);
+      expect(mobiledoc.sections[0]).toStrictEqual(section);
+    });
+
+    test('Throws an error if the tagName is not a string', () => {
+      const sections = [[1, true, [[0, [], 0, 'Hello world!']]]];
+      expect(() => {
+        new Mobiledoc({ sections });
+      }).toThrowError();
+    });
+  });
+
+  describe('Image sections', () => {
+    test('Supports image sections', () => {
+      const section = [2, '/path/to/image.jpeg'];
+      const mobiledoc = new Mobiledoc({ sections: [section] });
+
+      expect(mobiledoc.sections).toHaveLength(1);
+      expect(mobiledoc.sections[0]).toStrictEqual(section);
+    });
+
+    test('Requires an image source', () => {
+      expect(() => {
+        new Mobiledoc({ sections: [[2, undefined]] });
+      }).toThrowError();
+    });
+  });
+
+  describe('List sections', () => {
+    test('Supports list sections', () => {
+      const ulSection = [
+        3,
+        'ul',
+        [
+          [0, [], 0, 'List item 1'],
+          [0, [], 0, 'List item 2'],
+        ],
+        ['align', 'center'],
+      ];
+
+      const olSection = [
+        3,
+        'ol',
+        [
+          [0, [], 0, 'List item 1'],
+          [0, [], 0, 'List item 2'],
+        ],
+        ['align', 'center'],
+      ];
+      const mobiledoc = new Mobiledoc({ sections: [ulSection, olSection] });
+
+      expect(mobiledoc.sections).toHaveLength(2);
+      expect(mobiledoc.sections[0]).toStrictEqual(ulSection);
+      expect(mobiledoc.sections[1]).toStrictEqual(olSection);
+    });
+
+    test('Supports undefined markers', () => {
+      const mobiledoc = new Mobiledoc({ sections: [[3, 'ul']] });
+
+      expect(mobiledoc.sections).toHaveLength(1);
+      expect(mobiledoc.sections[0]).toStrictEqual([3, 'ul', [], undefined]);
+    });
+
+    test('Requires an array of markers', () => {
+      expect(() => {
+        new Mobiledoc({ sections: [[3, 'ul', {}]] });
+      }).toThrowError();
+    });
+
+    test('Only supports ul and ol lists', () => {
+      expect(() => {
+        new Mobiledoc({ sections: [[3, 'dl', [[0, [], 0, 'List item 1']]]] });
+      }).toThrowError();
+    });
+  });
+
+  describe('Card sections', () => {
+    test('Supports card sections', () => {
+      const sections = [[10, 0]];
+      const cards = [['bookmark', { type: 'link', url: '/' }]] as MobiledocCardType[];
+
+      const mobiledoc = new Mobiledoc({ cards, sections });
+
+      expect(mobiledoc.sections).toHaveLength(1);
+      expect(mobiledoc.sections[0]).toStrictEqual(sections[0]);
+      expect(mobiledoc.getCard(0)).toStrictEqual(cards[0]);
+    });
+
+    test('Throws an error if an undefined card is used', () => {
+      expect(() => {
+        new Mobiledoc({ sections: [[10, 0]] });
+      }).toThrowError();
+    });
+  });
+
+  test('Throws an error if an unsupported section type is requested', () => {
+    expect(() => {
+      new Mobiledoc({ sections: [[0]] });
+    }).toThrowError();
+
+    expect(() => {
+      new Mobiledoc({ sections: [[]] });
+    }).toThrowError();
+  });
 });

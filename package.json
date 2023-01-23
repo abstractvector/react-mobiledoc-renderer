@@ -12,6 +12,7 @@
     "lint": "eslint src/ --ext .ts",
     "prepare": "npm run lint && npm test && npm run build",
     "test": "jest",
+    "test:verbose": "jest --verbose",
     "test:coverage": "jest --coverage"
   },
   "keywords": [

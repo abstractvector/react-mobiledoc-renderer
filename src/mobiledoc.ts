@@ -62,7 +62,7 @@ export default class Mobiledoc {
   }
 
   #sanitizeMarkups(markups: (string | string[])[][]): MarkupType[] {
-    return (markups ?? []).map((markup) => {
+    return markups.map((markup) => {
       const [tagName, attributes = []] = markup;
 
       if (typeof tagName !== 'string') {
@@ -78,7 +78,7 @@ export default class Mobiledoc {
   }
 
   #sanitizeSections(sections: unknown[][]): SectionType[] {
-    return (sections ?? []).map((section) => {
+    return sections.map((section) => {
       const [sectionTypeIdentifier, ...sectionProps] = section;
 
       switch (sectionTypeIdentifier) {
@@ -111,16 +111,7 @@ export default class Mobiledoc {
             );
           }
 
-          if (!Array.isArray(markers)) {
-            throw new MobiledocError(`Expected array of markers for list section but received: ${markers}`);
-          }
-
-          return [
-            sectionTypeIdentifier,
-            tagName,
-            markers.map((m) => this.#sanitizeMarkers(m)),
-            optionalSectionAttributesArray,
-          ];
+          return [sectionTypeIdentifier, tagName, this.#sanitizeMarkers(markers), optionalSectionAttributesArray];
         }
 
         case 10: {

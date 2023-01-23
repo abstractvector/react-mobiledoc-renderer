@@ -46,7 +46,7 @@ const mobiledoc = {
 };
 
 // note that the .render() method is async
-const { result } = await renderer.render();
+const { result } = await renderer.render(mobiledoc);
 
 // the `result` is a React element
 return <article>{result}</article>;
