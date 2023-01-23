@@ -10,7 +10,7 @@ export type MarkerType =
 
 export type SectionMarkupType = [1, string, MarkerType[], string[] | undefined];
 export type SectionImageType = [2, string];
-export type SectionListType = [3, string, MarkerType[][], string[] | undefined];
+export type SectionListType = [3, string, MarkerType[], string[] | undefined];
 export type SectionCardType = [10, number];
 
 export type SectionType =

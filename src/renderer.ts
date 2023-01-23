@@ -77,10 +77,10 @@ export default class Renderer {
     return this.cards[cardName];
   }
 
-  #error(message: string): true {
+  #error(message: string): undefined {
     if (this.options['suppressErrors']) {
       if (typeof this.options['errorHandler'] === 'function') this.options['errorHandler'](message);
-      return true;
+      return undefined;
     }
 
     throw new RendererError(message);
@@ -135,7 +135,6 @@ export default class Renderer {
 
   async render(_mobiledoc: Mobiledoc | object): Promise<{
     result: React.ReactElement;
-    teardown: () => void;
   }> {
     const mobiledoc = _mobiledoc instanceof Mobiledoc ? _mobiledoc : new Mobiledoc(_mobiledoc);
 
@@ -145,12 +144,7 @@ export default class Renderer {
 
     const result = React.createElement(React.Fragment, { children: sectionElements });
 
-    return {
-      result,
-      teardown: () => {
-        this.#error('Teardown is not supported by this renderer');
-      },
-    };
+    return { result };
   }
 
   async #renderSection({
@@ -195,12 +189,8 @@ export default class Renderer {
         const [, tagName, listItems, optionalSectionAttributesArray] = section as SectionListType;
         const element = React.createElement(tagName, {
           children: await Promise.all(
-            listItems.map(async (markers) => {
-              return React.createElement('li', {
-                children: await Promise.all(
-                  markers.map((marker, key) => this.#renderMarker({ marker, key, mobiledoc }))
-                ),
-              });
+            listItems.map(async (li, key) => {
+              return React.createElement('li', { children: await this.#renderMarker({ marker: li, key, mobiledoc }) });
             })
           ),
           ...attributeArrayToReactProps(optionalSectionAttributesArray),
@@ -214,8 +204,7 @@ export default class Renderer {
         const cardDefinition = mobiledoc.getCard(cardIndex);
 
         if (cardDefinition === undefined) {
-          this.#error(`Could not locate card with index: ${cardIndex}`);
-          return undefined;
+          return this.#error(`Could not locate card with index: ${cardIndex}`);
         }
 
         const [cardName, cardPayload] = cardDefinition;
@@ -223,8 +212,7 @@ export default class Renderer {
         const card = this.getCard(cardName) ?? this.unknownCardComponent;
 
         if (card === undefined) {
-          this.#error(`No card handler specified for: ${cardName}`);
-          return undefined;
+          return this.#error(`No card handler specified for: ${cardName}`);
         }
 
         return React.createElement(card, {
@@ -235,9 +223,7 @@ export default class Renderer {
       }
     }
 
-    this.#error(`Could not parse unrecognized section type: ${sectionTypeIdentifier}`);
-
-    return undefined;
+    return this.#error(`Could not parse unrecognized section type: ${sectionTypeIdentifier}`);
   }
 
   async #renderMarker({
@@ -258,8 +244,7 @@ export default class Renderer {
           // @todo handle multiple openMarkupsIndexes
           const markup = mobiledoc.getMarkup(openMarkupsIndexes[0]);
           if (markup === undefined) {
-            this.#error(`Invalid markup reference: ${openMarkupsIndexes[0]}`);
-            return undefined;
+            return this.#error(`Invalid markup reference: ${openMarkupsIndexes[0]}`);
           }
           return await this.#renderMarkup({ markup, value, mobiledoc });
         } else {
@@ -272,8 +257,7 @@ export default class Renderer {
         const atomDefinition = mobiledoc.getAtom(value);
 
         if (atomDefinition === undefined) {
-          this.#error(`Could not locate atom with index: ${value}`);
-          return undefined;
+          return this.#error(`Could not locate atom with index: ${value}`);
         }
 
         const [atomName, atomText, atomPayload] = atomDefinition;
@@ -281,8 +265,7 @@ export default class Renderer {
         const atom = this.getAtom(atomName) ?? this.unknownAtomComponent;
 
         if (atom === undefined) {
-          this.#error(`No atom handler specified for: ${atomName}`);
-          return undefined;
+          return this.#error(`No atom handler specified for: ${atomName}`);
         }
 
         return React.createElement(atom, {
