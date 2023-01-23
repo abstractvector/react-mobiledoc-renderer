@@ -19,6 +19,10 @@
     "mobiledoc",
     "renderer"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/abstractvector/react-mobiledoc-renderer.git"
+  },
   "author": "Matt Knight <hello@mattknight.io>",
   "license": "MIT",
   "devDependencies": {
