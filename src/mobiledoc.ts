@@ -37,7 +37,7 @@ export default class Mobiledoc {
   cards: MobiledocCardType[];
   sections: SectionType[];
 
-  constructor({ version, markups, atoms, cards, sections }: MobiledocInput) {
+  constructor({ version, markups, atoms, cards, sections }: MobiledocInput = {}) {
     this.version = version ?? undefined;
 
     this.atoms = atoms ?? [];

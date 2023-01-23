@@ -1,4 +1,6 @@
-import { attributeArrayToReactProps } from '../src/utils';
+import { Utils } from '../src/';
+
+const { attributeArrayToReactProps } = Utils;
 
 describe('attributeArrayToReactProps function', () => {
   test('Returns an empty object by default', () => {
